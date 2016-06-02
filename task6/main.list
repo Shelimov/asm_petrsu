@@ -1,0 +1,408 @@
+GAS LISTING main.S 			page 1
+
+
+   1              	.include "macros.S"
+   1              	.macro Exit ret_val
+   2              		movl $1, %eax 		# номер сист. вызова exit
+   3              		movl \ret_val, %ebx 	# код выхода
+   4              		int $0x80 		# выполнить системный вызов
+   5              	.endm
+   6              	
+   7              	.macro Getchar buf_addr
+   8              		movl $3, %eax		# номер сист. вызова read
+   9              		movl $0, %ebx		# параметр 1: дескриптор стандартного ввода
+  10              		movl \buf_addr, %ecx	# параметр 2: адрес буфера (он же - фактическ
+  11              		     			# параметр макровызова)
+  12              		movl $1, %edx		# параметр 3: количество байтов для чтения
+  13              		int $0x80		# выполнить системный вызов
+  14              	.endm
+  15              	
+  16              	.macro Puts string
+  17              	.data
+  18              	    str\@: 	.ascii "\string\n"  # формирование фактической строки дл
+  19              		
+  20              	    strlen\@ = 	. - str\@           # получение значения длины строки
+  21              	
+  22              	.text
+  23              		pusha
+  24              		movl $4, %eax		# номер сист. вызова write
+  25              		movl $1, %ebx		# параметр 1: дескриптор стандартного вывода	
+  26              		movl $str\@, %ecx	# параметр 2: адрес памяти с выводимыми симво
+  27              		movl $strlen\@, %edx 	# параметр 3: количество байтов для вывода
+  28              		int $0x80		# выполнить системный вызов
+  29              		popa
+  30              	.endm
+  31              	
+  32              	.macro PrintNumber number
+  33              	.data
+  34              		symbol\@: .byte 0
+  35              	.text
+  36              		pusha
+  37              	
+  38              		movb $0, %bl # bl counter
+  39              	    movw \number, %ax
+  40              	    movw $10, %cx
+  41              	convert\@:    
+  42              	    movw $0, %dx
+  43              	    idivw %cx
+  44              	    incb %bl
+  45              	    push %dx
+  46              	    cmpw $0, %ax
+  47              	    jg convert\@ # reminder > 0
+  48              	    # reminder == 0
+  49              	    xor %eax, %eax
+  50              	print_digit\@:
+  51              	    cmpb $0, %bl
+  52              	    je end\@
+  53              	    pop %ax
+  54              	    decb %bl
+  55              	    addw $'0', %ax
+  56              	    movb %al, symbol\@
+GAS LISTING main.S 			page 2
+
+
+  57              	    push %ebx
+  58              	    movl $4, %eax		# номер сист. вызова write
+  59              		movl $1, %ebx		# параметр 1: дескриптор стандартного вывода	
+  60              		movl $symbol\@, %ecx	# параметр 2: адрес памяти с выводимыми сим�
+  61              		movl $1, %edx 	# параметр 3: количество байтов для вывода
+  62              		int $0x80		# выполнить системный вызов
+  63              	    pop %ebx
+  64              	    jmp print_digit\@
+  65              	end\@:
+  66              		popa
+  67              	.endm
+   2              	.data
+   3 0000 00000000 		vector: .long 0, 0, 0, 0, 0, 0
+   3      00000000 
+   3      00000000 
+   3      00000000 
+   3      00000000 
+   4 0018 0B000000 		matrix: .long 11, 12, 13, 14, 15, 16
+   4      0C000000 
+   4      0D000000 
+   4      0E000000 
+   4      0F000000 
+   5 0030 15000000 				.long 21, 22, 23, 24, 25, 26
+   5      16000000 
+   5      17000000 
+   5      18000000 
+   5      19000000 
+   6 0048 1F000000 				.long 31, 32, 33, 34, 35, 36
+   6      20000000 
+   6      21000000 
+   6      22000000 
+   6      23000000 
+   7 0060 29000000 				.long 41, 42, 43, 44, 45, 46
+   7      2A000000 
+   7      2B000000 
+   7      2C000000 
+   7      2D000000 
+   8 0078 33000000 				.long 51, 52, 53, 54, 55, 56
+   8      34000000 
+   8      35000000 
+   8      36000000 
+   8      37000000 
+   9 0090 3D000000 				.long 61, 62, 63, 64, 65, 66
+   9      3E000000 
+   9      3F000000 
+   9      40000000 
+   9      41000000 
+  10 00a8 FF       		k: .byte -1
+  11 00a9 FF       		l: .byte -1
+  12 00aa 00       		sym: .byte 0
+  13 00ab 0000     		_out: .short 0
+  14              	.text
+  15              	.global _start
+  16              	
+  17              	_start:
+  18 0000 29F6     	    sub %esi, %esi
+  19              	    Puts "Введите значения K и L в диапозоне от 1 до 6"
+GAS LISTING main.S 			page 3
+
+
+  19              	> .data
+  19 00ad D092D0B2 	>  str0:.ascii "Введите значения K и L в диапозоне от 1 до 6\n"
+  19      D0B5D0B4 
+  19      D0B8D182 
+  19      D0B520D0 
+  19      B7D0BDD0 
+  19              	>  
+  19              	>  strlen0 =. - str0
+  19              	> 
+  19              	> .text
+  19 0002 60       	>  pusha
+  19 0003 B8040000 	>  movl $4,%eax
+  19      00
+  19 0008 BB010000 	>  movl $1,%ebx
+  19      00
+  19 000d B9AD0000 	>  movl $str0,%ecx
+  19      00
+  19 0012 BA4B0000 	>  movl $strlen0,%edx
+  19      00
+  19 0017 CD80     	>  int $0x80
+  19 0019 61       	>  popa
+  20              	kbd_input:
+  21              	    Getchar $sym          # макровызов ввода символа со стандартн�
+  21 001a B8030000 	>  movl $3,%eax
+  21      00
+  21 001f BB000000 	>  movl $0,%ebx
+  21      00
+  21 0024 B9AA0000 	>  movl $sym,%ecx
+  21      00
+  21              	>  
+  21 0029 BA010000 	>  movl $1,%edx
+  21      00
+  21 002e CD80     	>  int $0x80
+  22 0030 83F800   	    cmpl $0, %eax 	# Конец файл - EOF (введено 0 символов) ? 
+  23 0033 0F845701 	    je finish		# Да - на завершение программы
+  23      0000
+  24              	    
+  25 0039 803DAA00 	    cmpb $'\n', sym	# это символ перевода строки ?
+  25      00000A
+  26 0040 74D8     	    je kbd_input
+  27 0042 803DAA00 	    cmpb $'9', sym 	# код больше кода символа '9' ?
+  27      000039
+  28 0049 77CF     	    ja kbd_input
+  29 004b 803DAA00 	    cmpb $'0', sym	# код меньше кода символа '0' ?
+  29      000030
+  30 0052 72C6     	    jb kbd_input	# ДА - на вывод сообщения об ошибке
+  31              	
+  32 0054 A0AA0000 	    movb sym, %al
+  32      00
+  33 0059 2C30     	    subb $'0', %al
+  34 005b 3C06     	    cmpb $6, %al
+  35 005d 771D     		ja print_error_msg
+  36 005f 3C01     		cmpb $1, %al
+  37 0061 7219     		jb print_error_msg
+  38 0063 803DA800 	   	cmpb $-1, k
+  38      0000FF
+  39 006a 7402     	   	je set_k
+GAS LISTING main.S 			page 4
+
+
+  40 006c EB07     		jmp set_l   	
+  41              	
+  42              	set_k:
+  43 006e A2A80000 		movb %al, k
+  43      00
+  44 0073 EBA5     		jmp kbd_input
+  45              	
+  46              	set_l:
+  47 0075 A2A90000 		movb %al, l
+  47      00
+  48 007a EB43     		jmp fill_vector
+  49              	
+  50              	print_error_msg:
+  51              	    Puts "Значения не попадают в диапозон от 1 до 6"
+  51              	> .data
+  51 00f8 D097D0BD 	>  str2:.ascii "Значения не попадают в диапозон от 1 до 6\n"
+  51      D0B0D187 
+  51      D0B5D0BD 
+  51      D0B8D18F 
+  51      20D0BDD0 
+  51              	>  
+  51              	>  strlen2 =. - str2
+  51              	> 
+  51              	> .text
+  51 007c 60       	>  pusha
+  51 007d B8040000 	>  movl $4,%eax
+  51      00
+  51 0082 BB010000 	>  movl $1,%ebx
+  51      00
+  51 0087 B9F80000 	>  movl $str2,%ecx
+  51      00
+  51 008c BA490000 	>  movl $strlen2,%edx
+  51      00
+  51 0091 CD80     	>  int $0x80
+  51 0093 61       	>  popa
+  52              	    Puts "Повторите ввод"
+  52              	> .data
+  52 0141 D09FD0BE 	>  str3:.ascii "Повторите ввод\n"
+  52      D0B2D182 
+  52      D0BED180 
+  52      D0B8D182 
+  52      D0B520D0 
+  52              	>  
+  52              	>  strlen3 =. - str3
+  52              	> 
+  52              	> .text
+  52 0094 60       	>  pusha
+  52 0095 B8040000 	>  movl $4,%eax
+  52      00
+  52 009a BB010000 	>  movl $1,%ebx
+  52      00
+  52 009f B9410100 	>  movl $str3,%ecx
+  52      00
+  52 00a4 BA1C0000 	>  movl $strlen3,%edx
+  52      00
+  52 00a9 CD80     	>  int $0x80
+  52 00ab 61       	>  popa
+GAS LISTING main.S 			page 5
+
+
+  53 00ac C605A800 	    movb $-1, k
+  53      0000FF
+  54 00b3 C605A900 	    movb $-1, l
+  54      0000FF
+  55 00ba E95BFFFF 	    jmp kbd_input
+  55      FF
+  56              	
+  57              	fill_vector:
+  58 00bf FE0DA800 		decb k # y, i
+  58      0000
+  59 00c5 FE0DA900 		decb l # i, x
+  59      0000
+  60 00cb 29F6     		sub %esi, %esi
+  61              	
+  62 00cd B000     		movb $0, %al # i = 0
+  63 00cf BE060000 		movl $6, %esi
+  63      00
+  64 00d4 50       		push %eax
+  65 00d5 29C0     		sub %eax, %eax
+  66 00d7 A0A80000 		movb k, %al
+  66      00
+  67 00dc 0FAFF0   		imul %eax, %esi # 6 * k
+  68 00df 58       		pop %eax
+  69 00e0 BA000000 		movl $0, %edx
+  69      00
+  70 00e5 8A15A900 		movb l, %dl
+  70      0000
+  71              		
+  72              	fv_loop:
+  73 00eb 3C06     		cmpb $6, %al
+  74 00ed 7423     		je print_vector
+  75 00ef 8B1CB518 		movl matrix(, %esi ,4), %ebx # ebx = matrix + (6 * k + i => esi)*4
+  75      000000
+  76 00f6 8B0C9518 		movl matrix(, %edx ,4), %ecx
+  76      000000
+  77 00fd 01CB     		addl %ecx, %ebx
+  78 00ff 29C9     		subl %ecx, %ecx
+  79 0101 88C1     		movb %al, %cl
+  80 0103 891C8D00 		movl %ebx, vector(, %ecx, 4)
+  80      000000
+  81              	
+  82 010a 46       		incl %esi
+  83 010b 80C206   		addb $6, %dl
+  84 010e FEC0     		incb %al
+  85 0110 EBD9     		jmp fv_loop
+  86              	
+  87              	print_vector:
+  88 0112 B8000000 		movl $0, %eax
+  88      00
+  89              	pv_loop:
+  90 0117 8B1C8500 		mov vector(, %eax, 4), %ebx
+  90      000000
+  91 011e 66891DAB 		mov %bx, _out
+  91      000000
+  92              		PrintNumber _out
+  92              	> .data
+  92 015d 00       	>  symbol4:.byte 0
+GAS LISTING main.S 			page 6
+
+
+  92              	> .text
+  92 0125 60       	>  pusha
+  92              	> 
+  92 0126 B300     	>  movb $0,%bl
+  92 0128 66A1AB00 	>  movw _out,%ax
+  92      0000
+  92 012e 66B90A00 	>  movw $10,%cx
+  92              	> convert4:
+  92 0132 66BA0000 	>  movw $0,%dx
+  92 0136 66F7F9   	>  idivw %cx
+  92 0139 FEC3     	>  incb %bl
+  92 013b 6652     	>  push %dx
+  92 013d 6683F800 	>  cmpw $0,%ax
+  92 0141 7FEF     	>  jg convert4
+  92              	>  
+  92 0143 31C0     	>  xor %eax,%eax
+  92              	> print_digit4:
+  92 0145 80FB00   	>  cmpb $0,%bl
+  92 0148 7427     	>  je end4
+  92 014a 6658     	>  pop %ax
+  92 014c FECB     	>  decb %bl
+  92 014e 6683C030 	>  addw $48,%ax
+  92 0152 A25D0100 	>  movb %al,symbol4
+  92      00
+  92 0157 53       	>  push %ebx
+  92 0158 B8040000 	>  movl $4,%eax
+  92      00
+  92 015d BB010000 	>  movl $1,%ebx
+  92      00
+  92 0162 B95D0100 	>  movl $symbol4,%ecx
+  92      00
+  92 0167 BA010000 	>  movl $1,%edx
+  92      00
+  92 016c CD80     	>  int $0x80
+  92 016e 5B       	>  pop %ebx
+  92 016f EBD4     	>  jmp print_digit4
+  92              	> end4:
+  92 0171 61       	>  popa
+  93              		Puts ""
+  93              	> .data
+  93 015e 0A       	>  str5:.ascii "\n"
+  93              	>  
+  93              	>  strlen5 =. - str5
+  93              	> 
+  93              	> .text
+  93 0172 60       	>  pusha
+  93 0173 B8040000 	>  movl $4,%eax
+  93      00
+  93 0178 BB010000 	>  movl $1,%ebx
+  93      00
+  93 017d B95E0100 	>  movl $str5,%ecx
+  93      00
+  93 0182 BA010000 	>  movl $strlen5,%edx
+  93      00
+  93 0187 CD80     	>  int $0x80
+  93 0189 61       	>  popa
+  94 018a 40       		inc %eax
+GAS LISTING main.S 			page 7
+
+
+  95 018b 83F806   		cmpl $6, %eax
+  96 018e 7587     		jne pv_loop
+  97              	finish:
+  98              	    Exit $0
+  98 0190 B8010000 	>  movl $1,%eax
+  98      00
+  98 0195 BB000000 	>  movl $0,%ebx
+  98      00
+  98 019a CD80     	>  int $0x80
+  99              	    
+ 100              	.end
+GAS LISTING main.S 			page 8
+
+
+DEFINED SYMBOLS
+              main.S:3      .data:0000000000000000 vector
+              main.S:4      .data:0000000000000018 matrix
+              main.S:10     .data:00000000000000a8 k
+              main.S:11     .data:00000000000000a9 l
+              main.S:12     .data:00000000000000aa sym
+              main.S:13     .data:00000000000000ab _out
+              main.S:17     .text:0000000000000000 _start
+              main.S:19     .data:00000000000000ad str0
+              main.S:19     *ABS*:000000000000004b strlen0
+              main.S:20     .text:000000000000001a kbd_input
+              main.S:97     .text:0000000000000190 finish
+              main.S:50     .text:000000000000007c print_error_msg
+              main.S:42     .text:000000000000006e set_k
+              main.S:46     .text:0000000000000075 set_l
+              main.S:57     .text:00000000000000bf fill_vector
+              main.S:51     .data:00000000000000f8 str2
+              main.S:51     *ABS*:0000000000000049 strlen2
+              main.S:52     .data:0000000000000141 str3
+              main.S:52     *ABS*:000000000000001c strlen3
+              main.S:72     .text:00000000000000eb fv_loop
+              main.S:87     .text:0000000000000112 print_vector
+              main.S:89     .text:0000000000000117 pv_loop
+              main.S:92     .data:000000000000015d symbol4
+              main.S:92     .text:0000000000000132 convert4
+              main.S:92     .text:0000000000000145 print_digit4
+              main.S:92     .text:0000000000000171 end4
+              main.S:93     .data:000000000000015e str5
+              main.S:93     *ABS*:0000000000000001 strlen5
+
+NO UNDEFINED SYMBOLS

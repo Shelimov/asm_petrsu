@@ -1,0 +1,656 @@
+GAS LISTING main.S 			page 1
+
+
+   1              	# Программа ввода кодов цифровых символов в буфер и вы�
+   2              	 
+   3              	
+   4              	.include "macros.S"
+   1              	.macro Exit ret_val
+   2              		movl $1, %eax 		# номер сист. вызова exit
+   3              		movl \ret_val, %ebx 	# код выхода
+   4              		int $0x80 		# выполнить системный вызов
+   5              	.endm
+   6              	
+   7              	.macro Getchar buf_addr
+   8              		movl $3, %eax		# номер сист. вызова read
+   9              		movl $0, %ebx		# параметр 1: дескриптор стандартного ввода
+  10              		movl \buf_addr, %ecx	# параметр 2: адрес буфера (он же - фактическ
+  11              		     			# параметр макровызова)
+  12              		movl $1, %edx		# параметр 3: количество байтов для чтения
+  13              		int $0x80		# выполнить системный вызов
+  14              	.endm
+  15              	
+  16              	.macro Puts string
+  17              	.data
+  18              	    str\@: 	.ascii "\string\n"  # формирование фактической строки дл
+  19              		
+  20              	    strlen\@ = 	. - str\@           # получение значения длины строки
+  21              	
+  22              	.text
+  23              		movl $4, %eax		# номер сист. вызова write
+  24              		movl $1, %ebx		# параметр 1: дескриптор стандартного вывода	
+  25              		movl $str\@, %ecx	# параметр 2: адрес памяти с выводимыми симво
+  26              		movl $strlen\@, %edx 	# параметр 3: количество байтов для вывода
+  27              		int $0x80		# выполнить системный вызов
+  28              	.endm
+  29              	
+  30              	.macro CalcN n
+  31              	.text
+  32              		mov %esi, %eax # кол-во символов в строке в eax
+  33              		mov $-1, %ebx # счетчик в ebx
+  34              		add $\n, %ebx
+  35              	calcloop\n:
+  36              		cmp %ebx, %eax # сравниваем счетчик ebx и eax
+  37              		jl endcalc\n
+  38              		mov %ebx, %esi
+  39              		movb buf(%esi), %cl
+  40              		addb %cl, sum\n
+  41              		add $\n, %ebx
+  42              		jmp calcloop\n
+  43              	endcalc\n:
+  44              		mov %eax, %esi
+  45              	.endm
+  46              	
+  47              	.macro PrintNumber number
+  48              	.data
+  49              		symbol\@: .byte 0
+  50              	.text
+  51              		pusha
+  52              	
+  53              		movb $0, %bl # bl counter
+GAS LISTING main.S 			page 2
+
+
+  54              	    movw \number, %ax
+  55              	    movw $10, %cx
+  56              	convert\@:    
+  57              	    movw $0, %dx
+  58              	    idivw %cx
+  59              	    incb %bl
+  60              	    push %dx
+  61              	    cmpw $0, %ax
+  62              	    jg convert\@ # reminder > 0
+  63              	    # reminder == 0
+  64              	    xor %eax, %eax
+  65              	print_digit\@:
+  66              	    cmpb $0, %bl
+  67              	    je end\@
+  68              	    pop %ax
+  69              	    decb %bl
+  70              	    addw $'0', %ax
+  71              	    movb %al, symbol\@
+  72              	    push %ebx
+  73              	    movl $4, %eax		# номер сист. вызова write
+  74              		movl $1, %ebx		# параметр 1: дескриптор стандартного вывода	
+  75              		movl $symbol\@, %ecx	# параметр 2: адрес памяти с выводимыми сим�
+  76              		movl $1, %edx 	# параметр 3: количество байтов для вывода
+  77              		int $0x80		# выполнить системный вызов
+  78              	    pop %ebx
+  79              	    jmp print_digit\@
+  80              	end\@:
+  81              		popa
+  82              	.endm
+   5              	.bss 
+   6              	    .lcomm buf, 100
+   7              	.data
+   8 0000 00       	    sym: .byte 0
+   9 0001 02       	    div2: .byte 2
+  10 0002 03       	    div3: .byte 3
+  11 0003 04       	    div4: .byte 4
+  12 0004 08       	    div8: .byte 8
+  13 0005 0000     	    sum2: .short 0
+  14 0007 0000     	    sum3: .short 0
+  15 0009 0000     	    sum4: .short 0
+  16 000b 0000     	    sum8: .short 0
+  17              	
+  18              	.text
+  19              	.global _start
+  20              	
+  21              	_start:
+  22 0000 29F6     	    sub %esi, %esi
+  23              	
+  24              	kbd_input:
+  25 0002 83FE63   	    cmp $99, %esi
+  26 0005 7446     	    je print_full_msg
+  27              	    Getchar $sym          # макровызов ввода символа со стандартн�
+  27 0007 B8030000 	>  movl $3,%eax
+  27      00
+  27 000c BB000000 	>  movl $0,%ebx
+  27      00
+  27 0011 B9000000 	>  movl $sym,%ecx
+GAS LISTING main.S 			page 3
+
+
+  27      00
+  27              	>  
+  27 0016 BA010000 	>  movl $1,%edx
+  27      00
+  27 001b CD80     	>  int $0x80
+  28 001d 83F800   	    cmpl $0, %eax 	# Конец файл - EOF (введено 0 символов) ? 
+  29 0020 7443     	    je finish		# Да - на завершение программы
+  30              	    
+  31 0022 803D0000 	    cmpb $'\n', sym	# это символ перевода строки ?
+  31      00000A
+  32 0029 743A     	    je finish
+  33 002b 803D0000 	    cmpb $'9', sym 	# код больше кода символа '9' ?
+  33      000039
+  34 0032 77CE     	    ja kbd_input	# ДА - на вывод сообщения об ошибке
+  35 0034 803D0000 	    cmpb $'0', sym	# код меньше кода символа '0' ?
+  35      000030
+  36 003b 72C5     	    jb kbd_input	# ДА - на вывод сообщения об ошибке
+  37              	
+  38 003d A0000000 	    movb sym, %al
+  38      00
+  39 0042 2C30     	    subb $'0', %al
+  40 0044 88860000 	    movb %al, buf(%esi)
+  40      0000
+  41 004a 46       	    inc %esi
+  42 004b EBB5     	    jmp kbd_input
+  43              	
+  44              	print_full_msg:
+  45              	    Puts "Буфер чисел полный. Вывод и завершение программы
+  45              	> .data
+  45 000d D091D183 	>  str1:.ascii "Буфер чисел полный. Вывод и завершение программы.\n"
+  45      D184D0B5 
+  45      D18020D1 
+  45      87D0B8D1 
+  45      81D0B5D0 
+  45              	>  
+  45              	>  strlen1 =. - str1
+  45              	> 
+  45              	> .text
+  45 004d B8040000 	>  movl $4,%eax
+  45      00
+  45 0052 BB010000 	>  movl $1,%ebx
+  45      00
+  45 0057 B90D0000 	>  movl $str1,%ecx
+  45      00
+  45 005c BA5B0000 	>  movl $strlen1,%edx
+  45      00
+  45 0061 CD80     	>  int $0x80
+  46 0063 EB00     	    jmp finish
+  47              	
+  48              	finish:
+  49              	    CalcN 2
+  49              	> .text
+  49 0065 89F0     	>  mov %esi,%eax
+  49 0067 BBFFFFFF 	>  mov $-1,%ebx
+  49      FF
+  49 006c 83C302   	>  add $2,%ebx
+  49              	> calcloop2:
+GAS LISTING main.S 			page 4
+
+
+  49 006f 39D8     	>  cmp %ebx,%eax
+  49 0071 7C13     	>  jl endcalc2
+  49 0073 89DE     	>  mov %ebx,%esi
+  49 0075 8A8E0000 	>  movb buf(%esi),%cl
+  49      0000
+  49 007b 000D0500 	>  addb %cl,sum2
+  49      0000
+  49 0081 83C302   	>  add $2,%ebx
+  49 0084 EBE9     	>  jmp calcloop2
+  49              	> endcalc2:
+  49 0086 89C6     	>  mov %eax,%esi
+  50              	    CalcN 3
+  50              	> .text
+  50 0088 89F0     	>  mov %esi,%eax
+  50 008a BBFFFFFF 	>  mov $-1,%ebx
+  50      FF
+  50 008f 83C303   	>  add $3,%ebx
+  50              	> calcloop3:
+  50 0092 39D8     	>  cmp %ebx,%eax
+  50 0094 7C13     	>  jl endcalc3
+  50 0096 89DE     	>  mov %ebx,%esi
+  50 0098 8A8E0000 	>  movb buf(%esi),%cl
+  50      0000
+  50 009e 000D0700 	>  addb %cl,sum3
+  50      0000
+  50 00a4 83C303   	>  add $3,%ebx
+  50 00a7 EBE9     	>  jmp calcloop3
+  50              	> endcalc3:
+  50 00a9 89C6     	>  mov %eax,%esi
+  51              	    CalcN 4
+  51              	> .text
+  51 00ab 89F0     	>  mov %esi,%eax
+  51 00ad BBFFFFFF 	>  mov $-1,%ebx
+  51      FF
+  51 00b2 83C304   	>  add $4,%ebx
+  51              	> calcloop4:
+  51 00b5 39D8     	>  cmp %ebx,%eax
+  51 00b7 7C13     	>  jl endcalc4
+  51 00b9 89DE     	>  mov %ebx,%esi
+  51 00bb 8A8E0000 	>  movb buf(%esi),%cl
+  51      0000
+  51 00c1 000D0900 	>  addb %cl,sum4
+  51      0000
+  51 00c7 83C304   	>  add $4,%ebx
+  51 00ca EBE9     	>  jmp calcloop4
+  51              	> endcalc4:
+  51 00cc 89C6     	>  mov %eax,%esi
+  52              	    CalcN 8
+  52              	> .text
+  52 00ce 89F0     	>  mov %esi,%eax
+  52 00d0 BBFFFFFF 	>  mov $-1,%ebx
+  52      FF
+  52 00d5 83C308   	>  add $8,%ebx
+  52              	> calcloop8:
+  52 00d8 39D8     	>  cmp %ebx,%eax
+  52 00da 7C13     	>  jl endcalc8
+  52 00dc 89DE     	>  mov %ebx,%esi
+GAS LISTING main.S 			page 5
+
+
+  52 00de 8A8E0000 	>  movb buf(%esi),%cl
+  52      0000
+  52 00e4 000D0B00 	>  addb %cl,sum8
+  52      0000
+  52 00ea 83C308   	>  add $8,%ebx
+  52 00ed EBE9     	>  jmp calcloop8
+  52              	> endcalc8:
+  52 00ef 89C6     	>  mov %eax,%esi
+  53              	    Puts "Сумма цифр по 2кратным позициям"
+  53              	> .data
+  53 0068 D0A1D183 	>  str6:.ascii "Сумма цифр по 2кратным позициям\n"
+  53      D0BCD0BC 
+  53      D0B020D1 
+  53      86D0B8D1 
+  53      84D18020 
+  53              	>  
+  53              	>  strlen6 =. - str6
+  53              	> 
+  53              	> .text
+  53 00f1 B8040000 	>  movl $4,%eax
+  53      00
+  53 00f6 BB010000 	>  movl $1,%ebx
+  53      00
+  53 00fb B9680000 	>  movl $str6,%ecx
+  53      00
+  53 0100 BA3A0000 	>  movl $strlen6,%edx
+  53      00
+  53 0105 CD80     	>  int $0x80
+  54              	    PrintNumber sum2
+  54              	> .data
+  54 00a2 00       	>  symbol7:.byte 0
+  54              	> .text
+  54 0107 60       	>  pusha
+  54              	> 
+  54 0108 B300     	>  movb $0,%bl
+  54 010a 66A10500 	>  movw sum2,%ax
+  54      0000
+  54 0110 66B90A00 	>  movw $10,%cx
+  54              	> convert7:
+  54 0114 66BA0000 	>  movw $0,%dx
+  54 0118 66F7F9   	>  idivw %cx
+  54 011b FEC3     	>  incb %bl
+  54 011d 6652     	>  push %dx
+  54 011f 6683F800 	>  cmpw $0,%ax
+  54 0123 7FEF     	>  jg convert7
+  54              	>  
+  54 0125 31C0     	>  xor %eax,%eax
+  54              	> print_digit7:
+  54 0127 80FB00   	>  cmpb $0,%bl
+  54 012a 7427     	>  je end7
+  54 012c 6658     	>  pop %ax
+  54 012e FECB     	>  decb %bl
+  54 0130 6683C030 	>  addw $48,%ax
+  54 0134 A2A20000 	>  movb %al,symbol7
+  54      00
+  54 0139 53       	>  push %ebx
+  54 013a B8040000 	>  movl $4,%eax
+GAS LISTING main.S 			page 6
+
+
+  54      00
+  54 013f BB010000 	>  movl $1,%ebx
+  54      00
+  54 0144 B9A20000 	>  movl $symbol7,%ecx
+  54      00
+  54 0149 BA010000 	>  movl $1,%edx
+  54      00
+  54 014e CD80     	>  int $0x80
+  54 0150 5B       	>  pop %ebx
+  54 0151 EBD4     	>  jmp print_digit7
+  54              	> end7:
+  54 0153 61       	>  popa
+  55              	    Puts ""
+  55              	> .data
+  55 00a3 0A       	>  str8:.ascii "\n"
+  55              	>  
+  55              	>  strlen8 =. - str8
+  55              	> 
+  55              	> .text
+  55 0154 B8040000 	>  movl $4,%eax
+  55      00
+  55 0159 BB010000 	>  movl $1,%ebx
+  55      00
+  55 015e B9A30000 	>  movl $str8,%ecx
+  55      00
+  55 0163 BA010000 	>  movl $strlen8,%edx
+  55      00
+  55 0168 CD80     	>  int $0x80
+  56              	    Puts "Сумма цифр по 3кратным позициям"
+  56              	> .data
+  56 00a4 D0A1D183 	>  str9:.ascii "Сумма цифр по 3кратным позициям\n"
+  56      D0BCD0BC 
+  56      D0B020D1 
+  56      86D0B8D1 
+  56      84D18020 
+  56              	>  
+  56              	>  strlen9 =. - str9
+  56              	> 
+  56              	> .text
+  56 016a B8040000 	>  movl $4,%eax
+  56      00
+  56 016f BB010000 	>  movl $1,%ebx
+  56      00
+  56 0174 B9A40000 	>  movl $str9,%ecx
+  56      00
+  56 0179 BA3A0000 	>  movl $strlen9,%edx
+  56      00
+  56 017e CD80     	>  int $0x80
+  57              	    PrintNumber sum3
+  57              	> .data
+  57 00de 00       	>  symbol10:.byte 0
+  57              	> .text
+  57 0180 60       	>  pusha
+  57              	> 
+  57 0181 B300     	>  movb $0,%bl
+  57 0183 66A10700 	>  movw sum3,%ax
+  57      0000
+GAS LISTING main.S 			page 7
+
+
+  57 0189 66B90A00 	>  movw $10,%cx
+  57              	> convert10:
+  57 018d 66BA0000 	>  movw $0,%dx
+  57 0191 66F7F9   	>  idivw %cx
+  57 0194 FEC3     	>  incb %bl
+  57 0196 6652     	>  push %dx
+  57 0198 6683F800 	>  cmpw $0,%ax
+  57 019c 7FEF     	>  jg convert10
+  57              	>  
+  57 019e 31C0     	>  xor %eax,%eax
+  57              	> print_digit10:
+  57 01a0 80FB00   	>  cmpb $0,%bl
+  57 01a3 7427     	>  je end10
+  57 01a5 6658     	>  pop %ax
+  57 01a7 FECB     	>  decb %bl
+  57 01a9 6683C030 	>  addw $48,%ax
+  57 01ad A2DE0000 	>  movb %al,symbol10
+  57      00
+  57 01b2 53       	>  push %ebx
+  57 01b3 B8040000 	>  movl $4,%eax
+  57      00
+  57 01b8 BB010000 	>  movl $1,%ebx
+  57      00
+  57 01bd B9DE0000 	>  movl $symbol10,%ecx
+  57      00
+  57 01c2 BA010000 	>  movl $1,%edx
+  57      00
+  57 01c7 CD80     	>  int $0x80
+  57 01c9 5B       	>  pop %ebx
+  57 01ca EBD4     	>  jmp print_digit10
+  57              	> end10:
+  57 01cc 61       	>  popa
+  58              	    Puts ""
+  58              	> .data
+  58 00df 0A       	>  str11:.ascii "\n"
+  58              	>  
+  58              	>  strlen11 =. - str11
+  58              	> 
+  58              	> .text
+  58 01cd B8040000 	>  movl $4,%eax
+  58      00
+  58 01d2 BB010000 	>  movl $1,%ebx
+  58      00
+  58 01d7 B9DF0000 	>  movl $str11,%ecx
+  58      00
+  58 01dc BA010000 	>  movl $strlen11,%edx
+  58      00
+  58 01e1 CD80     	>  int $0x80
+  59              	    Puts "Сумма цифр по 4кратным позициям"
+  59              	> .data
+  59 00e0 D0A1D183 	>  str12:.ascii "Сумма цифр по 4кратным позициям\n"
+  59      D0BCD0BC 
+  59      D0B020D1 
+  59      86D0B8D1 
+  59      84D18020 
+  59              	>  
+  59              	>  strlen12 =. - str12
+GAS LISTING main.S 			page 8
+
+
+  59              	> 
+  59              	> .text
+  59 01e3 B8040000 	>  movl $4,%eax
+  59      00
+  59 01e8 BB010000 	>  movl $1,%ebx
+  59      00
+  59 01ed B9E00000 	>  movl $str12,%ecx
+  59      00
+  59 01f2 BA3A0000 	>  movl $strlen12,%edx
+  59      00
+  59 01f7 CD80     	>  int $0x80
+  60              	    PrintNumber sum4
+  60              	> .data
+  60 011a 00       	>  symbol13:.byte 0
+  60              	> .text
+  60 01f9 60       	>  pusha
+  60              	> 
+  60 01fa B300     	>  movb $0,%bl
+  60 01fc 66A10900 	>  movw sum4,%ax
+  60      0000
+  60 0202 66B90A00 	>  movw $10,%cx
+  60              	> convert13:
+  60 0206 66BA0000 	>  movw $0,%dx
+  60 020a 66F7F9   	>  idivw %cx
+  60 020d FEC3     	>  incb %bl
+  60 020f 6652     	>  push %dx
+  60 0211 6683F800 	>  cmpw $0,%ax
+  60 0215 7FEF     	>  jg convert13
+  60              	>  
+  60 0217 31C0     	>  xor %eax,%eax
+  60              	> print_digit13:
+  60 0219 80FB00   	>  cmpb $0,%bl
+  60 021c 7427     	>  je end13
+  60 021e 6658     	>  pop %ax
+  60 0220 FECB     	>  decb %bl
+  60 0222 6683C030 	>  addw $48,%ax
+  60 0226 A21A0100 	>  movb %al,symbol13
+  60      00
+  60 022b 53       	>  push %ebx
+  60 022c B8040000 	>  movl $4,%eax
+  60      00
+  60 0231 BB010000 	>  movl $1,%ebx
+  60      00
+  60 0236 B91A0100 	>  movl $symbol13,%ecx
+  60      00
+  60 023b BA010000 	>  movl $1,%edx
+  60      00
+  60 0240 CD80     	>  int $0x80
+  60 0242 5B       	>  pop %ebx
+  60 0243 EBD4     	>  jmp print_digit13
+  60              	> end13:
+  60 0245 61       	>  popa
+  61              	    Puts ""
+  61              	> .data
+  61 011b 0A       	>  str14:.ascii "\n"
+  61              	>  
+  61              	>  strlen14 =. - str14
+GAS LISTING main.S 			page 9
+
+
+  61              	> 
+  61              	> .text
+  61 0246 B8040000 	>  movl $4,%eax
+  61      00
+  61 024b BB010000 	>  movl $1,%ebx
+  61      00
+  61 0250 B91B0100 	>  movl $str14,%ecx
+  61      00
+  61 0255 BA010000 	>  movl $strlen14,%edx
+  61      00
+  61 025a CD80     	>  int $0x80
+  62              	    Puts "Сумма цифр по 8кратным позициям"
+  62              	> .data
+  62 011c D0A1D183 	>  str15:.ascii "Сумма цифр по 8кратным позициям\n"
+  62      D0BCD0BC 
+  62      D0B020D1 
+  62      86D0B8D1 
+  62      84D18020 
+  62              	>  
+  62              	>  strlen15 =. - str15
+  62              	> 
+  62              	> .text
+  62 025c B8040000 	>  movl $4,%eax
+  62      00
+  62 0261 BB010000 	>  movl $1,%ebx
+  62      00
+  62 0266 B91C0100 	>  movl $str15,%ecx
+  62      00
+  62 026b BA3A0000 	>  movl $strlen15,%edx
+  62      00
+  62 0270 CD80     	>  int $0x80
+  63              	    PrintNumber sum8
+  63              	> .data
+  63 0156 00       	>  symbol16:.byte 0
+  63              	> .text
+  63 0272 60       	>  pusha
+  63              	> 
+  63 0273 B300     	>  movb $0,%bl
+  63 0275 66A10B00 	>  movw sum8,%ax
+  63      0000
+  63 027b 66B90A00 	>  movw $10,%cx
+  63              	> convert16:
+  63 027f 66BA0000 	>  movw $0,%dx
+  63 0283 66F7F9   	>  idivw %cx
+  63 0286 FEC3     	>  incb %bl
+  63 0288 6652     	>  push %dx
+  63 028a 6683F800 	>  cmpw $0,%ax
+  63 028e 7FEF     	>  jg convert16
+  63              	>  
+  63 0290 31C0     	>  xor %eax,%eax
+  63              	> print_digit16:
+  63 0292 80FB00   	>  cmpb $0,%bl
+  63 0295 7427     	>  je end16
+  63 0297 6658     	>  pop %ax
+  63 0299 FECB     	>  decb %bl
+  63 029b 6683C030 	>  addw $48,%ax
+  63 029f A2560100 	>  movb %al,symbol16
+GAS LISTING main.S 			page 10
+
+
+  63      00
+  63 02a4 53       	>  push %ebx
+  63 02a5 B8040000 	>  movl $4,%eax
+  63      00
+  63 02aa BB010000 	>  movl $1,%ebx
+  63      00
+  63 02af B9560100 	>  movl $symbol16,%ecx
+  63      00
+  63 02b4 BA010000 	>  movl $1,%edx
+  63      00
+  63 02b9 CD80     	>  int $0x80
+  63 02bb 5B       	>  pop %ebx
+  63 02bc EBD4     	>  jmp print_digit16
+  63              	> end16:
+  63 02be 61       	>  popa
+  64              	    Puts ""
+  64              	> .data
+  64 0157 0A       	>  str17:.ascii "\n"
+  64              	>  
+  64              	>  strlen17 =. - str17
+  64              	> 
+  64              	> .text
+  64 02bf B8040000 	>  movl $4,%eax
+  64      00
+  64 02c4 BB010000 	>  movl $1,%ebx
+  64      00
+  64 02c9 B9570100 	>  movl $str17,%ecx
+  64      00
+  64 02ce BA010000 	>  movl $strlen17,%edx
+  64      00
+  64 02d3 CD80     	>  int $0x80
+  65              	    Exit $0
+  65 02d5 B8010000 	>  movl $1,%eax
+  65      00
+  65 02da BB000000 	>  movl $0,%ebx
+  65      00
+  65 02df CD80     	>  int $0x80
+  66              	stop:
+  67              	    # Puts char
+  68              	    Exit $0
+  68 02e1 B8010000 	>  movl $1,%eax
+  68      00
+  68 02e6 BB000000 	>  movl $0,%ebx
+  68      00
+  68 02eb CD80     	>  int $0x80
+  69              	    
+  70              	.end
+GAS LISTING main.S 			page 11
+
+
+DEFINED SYMBOLS
+              main.S:6      .bss:0000000000000000 buf
+              main.S:8      .data:0000000000000000 sym
+              main.S:9      .data:0000000000000001 div2
+              main.S:10     .data:0000000000000002 div3
+              main.S:11     .data:0000000000000003 div4
+              main.S:12     .data:0000000000000004 div8
+              main.S:13     .data:0000000000000005 sum2
+              main.S:14     .data:0000000000000007 sum3
+              main.S:15     .data:0000000000000009 sum4
+              main.S:16     .data:000000000000000b sum8
+              main.S:21     .text:0000000000000000 _start
+              main.S:24     .text:0000000000000002 kbd_input
+              main.S:44     .text:000000000000004d print_full_msg
+              main.S:48     .text:0000000000000065 finish
+              main.S:45     .data:000000000000000d str1
+              main.S:45     *ABS*:000000000000005b strlen1
+              main.S:49     .text:000000000000006f calcloop2
+              main.S:49     .text:0000000000000086 endcalc2
+              main.S:50     .text:0000000000000092 calcloop3
+              main.S:50     .text:00000000000000a9 endcalc3
+              main.S:51     .text:00000000000000b5 calcloop4
+              main.S:51     .text:00000000000000cc endcalc4
+              main.S:52     .text:00000000000000d8 calcloop8
+              main.S:52     .text:00000000000000ef endcalc8
+              main.S:53     .data:0000000000000068 str6
+              main.S:53     *ABS*:000000000000003a strlen6
+              main.S:54     .data:00000000000000a2 symbol7
+              main.S:54     .text:0000000000000114 convert7
+              main.S:54     .text:0000000000000127 print_digit7
+              main.S:54     .text:0000000000000153 end7
+              main.S:55     .data:00000000000000a3 str8
+              main.S:55     *ABS*:0000000000000001 strlen8
+              main.S:56     .data:00000000000000a4 str9
+              main.S:56     *ABS*:000000000000003a strlen9
+              main.S:57     .data:00000000000000de symbol10
+              main.S:57     .text:000000000000018d convert10
+              main.S:57     .text:00000000000001a0 print_digit10
+              main.S:57     .text:00000000000001cc end10
+              main.S:58     .data:00000000000000df str11
+              main.S:58     *ABS*:0000000000000001 strlen11
+              main.S:59     .data:00000000000000e0 str12
+              main.S:59     *ABS*:000000000000003a strlen12
+              main.S:60     .data:000000000000011a symbol13
+              main.S:60     .text:0000000000000206 convert13
+              main.S:60     .text:0000000000000219 print_digit13
+              main.S:60     .text:0000000000000245 end13
+              main.S:61     .data:000000000000011b str14
+              main.S:61     *ABS*:0000000000000001 strlen14
+              main.S:62     .data:000000000000011c str15
+              main.S:62     *ABS*:000000000000003a strlen15
+              main.S:63     .data:0000000000000156 symbol16
+              main.S:63     .text:000000000000027f convert16
+              main.S:63     .text:0000000000000292 print_digit16
+              main.S:63     .text:00000000000002be end16
+              main.S:64     .data:0000000000000157 str17
+              main.S:64     *ABS*:0000000000000001 strlen17
+GAS LISTING main.S 			page 12
+
+
+              main.S:66     .text:00000000000002e1 stop
+
+NO UNDEFINED SYMBOLS
