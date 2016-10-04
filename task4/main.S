@@ -45,7 +45,6 @@ print_err_msg:
     jmp show_prompt 	# на ввод следующего символа
 
 print_sum:
-    Puts "Сумма цифр"
     PrintNumber sum
 stop:
     # Puts char
